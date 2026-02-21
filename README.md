@@ -106,7 +106,46 @@ curl -X POST "http://your-domain.com/index.php" \
 
 ---
 
-### 2. 查询任务进度
+### 2. 视频生视频
+
+#### 接口说明
+上传一个视频，以该视频为基础生成新的AI视频。
+
+#### 请求参数
+
+| 参数名 | 类型 | 必填 | 默认值 | 说明 |
+|--------|------|------|--------|------|
+| `type` | string | 是 | - | 操作类型，固定为 `video_process` |
+| `model` | string | 否 | `SuiBian/process` | 模型名称 |
+| `url` | string | 是 | - | 视频URL（单个） |
+| `ugc_text` | array | 是 | - | 提示词数组（格式同上） |
+
+#### 请求示例
+
+```bash
+curl -X POST "http://your-domain.com/index.php" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "video_process",
+    "model": "SuiBian/process",
+    "url": "https://example.com/video.mp4",
+    "ugc_text": [
+      {
+        "full_word": "改一下风格",
+        "content": "改一下风格",
+        "type": 2
+      }
+    ]
+  }'
+```
+
+#### 响应示例
+
+与图片生视频相同，返回 `task_id`，通过查询接口获取结果。
+
+---
+
+### 3. 查询任务进度
 
 #### 接口说明
 根据任务ID查询AI视频生成任务的进度和结果。

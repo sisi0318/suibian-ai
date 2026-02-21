@@ -96,6 +96,54 @@ switch ($type) {
         $className::process($ugc_text, $resource_list);
         break;
 
+    case 'video_process':
+        $m = explode("/", $model);
+
+        if (count($m) < 2) {
+            tools::__echo(400, "模型格式错误");
+        }
+
+        $moduleName = $m[0];
+        $className = 'module\\' . ucfirst($moduleName);
+
+        if (!class_exists($className)) {
+            tools::__echo(400, "不支持的模型: {$moduleName}");
+        }
+        if (!method_exists($className, 'process')) {
+            tools::__echo(400, "模块 {$moduleName} 不支持process方法");
+        }
+
+        if (empty($url)) {
+            tools::__echo(400, "缺少视频url参数");
+        }
+
+        $videoUpload = attachments::video_snssdk_signs(1);
+        if (empty($videoUpload)) {
+            tools::__echo(500, "获取视频上传签名失败");
+        }
+
+        $up = attachments::web_upload_video($url, $videoUpload);
+        if (!$up) {
+            tools::__echo(500, "视频上传失败");
+        }
+
+        $storeUri = $up['store_uri'];
+        $videoMeta = $up['video_meta'] ?? [];
+        $vWidth = $videoMeta['Width'] ?? 720;
+        $vHeight = $videoMeta['Height'] ?? 720;
+
+        $resource_list = [
+            [
+                "extra" => "{\"VideoInfo\":{\"frame_info\":[{\"uri\":\"tos-cn-i-hv477ye453\\/ca7431dffaeb4b12bb102be7dfcac198\",\"faceCount\":0,\"pet_count\":0,\"face_count\":0,\"age\":0,\"width\":{$vWidth},\"height\":{$vHeight}}],\"reference_type\":\"video_edit\"}}",
+                "material_type" => 1,
+                "media_type" => 2,
+                "uri" => $up['vid']
+            ]
+        ];
+
+        $className::process($ugc_text, $resource_list);
+        break;
+
     case 'query':
         $m = explode("/", $model);
 
