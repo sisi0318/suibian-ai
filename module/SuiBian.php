@@ -54,6 +54,7 @@ class SuiBian
                 "content-type" => "application/json; encoding=utf-8",
                 "user-agent" => "com.ss.android.spark/370702",
                 "Cookie" => Config::COOKIE,
+                "x-khronos" => $ts,
             ],
             'body' => json_encode($body, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
         ];
@@ -83,6 +84,7 @@ class SuiBian
             "content-type" => "application/json; encoding=utf-8",
             "user-agent"   => "com.ss.android.spark/370702",
             "Cookie"       => Config::COOKIE,
+            "x-khronos" => $ts,
         ];
 
         $get = self::get($api, $headers);
@@ -129,7 +131,7 @@ class SuiBian
                 'covers'       => $covers,               // 封面直链，status==2 时有内容
                 'wait_seconds' => $task['wait_seconds']  ?? 0,
                 'wait_minutes' => $task['wait_minutes']  ?? 0,
-                'wait_time_tip'=> $task['wait_time_tip'] ?? '',
+                'wait_time_tip' => $task['wait_time_tip'] ?? '',
                 'raw'          => $task,                 // 保留原始数据
             ];
 
