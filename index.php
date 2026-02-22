@@ -30,17 +30,18 @@ $url = $params['url'] ?? "";
 if (empty($ugc_text) && empty($taskId)) {
     tools::__echo(400, "缺少ugc_text参数");
 } else {
-    // 为每个 ugc_text 项自动添加 type = 2
     foreach ($ugc_text as $key => &$item) {
         if (!isset($item['type'])) {
             $item['type'] = 2;
         }
-        // 验证必填字段
-        if (empty($item['full_word']) || empty($item['content'])) {
-            tools::__echo(400, "ugc_text 第" . ($key + 1) . "项缺少 full_word 或 content 字段");
+        if (empty($item['content'])) {
+            tools::__echo(400, "ugc_text 第" . ($key + 1) . "项缺少 content 字段");
+        }
+        if ($type !== 'image_process' && empty($item['full_word'])) {
+            tools::__echo(400, "ugc_text 第" . ($key + 1) . "项缺少 full_word 字段");
         }
     }
-    unset($item); // 解除引用
+    unset($item);
 }
 
 
@@ -94,6 +95,40 @@ switch ($type) {
             ];
         }
         $className::process($ugc_text, $resource_list);
+        break;
+
+    case 'image_process':
+        $m = explode("/", $model);
+
+        if (count($m) < 2) {
+            tools::__echo(400, "模型格式错误");
+        }
+
+        $moduleName = $m[0];
+        $className = 'module\\' . ucfirst($moduleName);
+
+        if (!class_exists($className)) {
+            tools::__echo(400, "不支持的模型: {$moduleName}");
+        }
+        if (!method_exists($className, 'process')) {
+            tools::__echo(400, "模块 {$moduleName} 不支持process方法");
+        }
+
+        $urls = explode(",", $url);
+        $upload = attachments::snssdk_signs("", "", count($urls));
+        foreach ($urls as $key => $value) {
+            if (empty($value)) {
+                tools::__echo(500, "第" . ($key + 1) . "个url参数为空");
+            }
+            $up = attachments::web_upload($value, $upload[$key]);
+            $resource_list[] = [
+                "extra" => "{\"ImageInfo\":{\"faceCount\":0,\"pet_count\":0,\"face_count\":0,\"width\":{$up['width']},\"height\":{$up['height']}}}",
+                "material_type" => 1,
+                "media_type" => 1,
+                "uri" => $up['uri']
+            ];
+        }
+        $className::process($ugc_text, $resource_list, 'Image');
         break;
 
     case 'video_process':

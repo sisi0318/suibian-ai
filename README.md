@@ -106,7 +106,46 @@ curl -X POST "http://your-domain.com/index.php" \
 
 ---
 
-### 2. 视频生视频
+### 2. 图片生图片
+
+#### 接口说明
+上传图片，以该图片为基础生成新的AI图片。
+
+#### 请求参数
+
+| 参数名 | 类型 | 必填 | 默认值 | 说明 |
+|--------|------|------|--------|------|
+| `type` | string | 是 | - | 操作类型，固定为 `image_process` |
+| `model` | string | 否 | `SuiBian/process` | 模型名称 |
+| `url` | string | 是 | - | 图片URL，多个用逗号分隔 |
+| `ugc_text` | array | 是 | - | 提示词数组（格式同上） |
+
+#### 请求示例
+
+```bash
+curl -X POST "http://your-domain.com/index.php" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "image_process",
+    "model": "SuiBian/process",
+    "url": "https://example.com/image.jpg",
+    "ugc_text": [
+      {
+        "full_word": "改变小兔发色",
+        "content": "改变小兔发色",
+        "type": 2
+      }
+    ]
+  }'
+```
+
+#### 响应示例
+
+与图片生视频相同，返回 `task_id`，通过查询接口获取结果。
+
+---
+
+### 3. 视频生视频
 
 #### 接口说明
 上传一个视频，以该视频为基础生成新的AI视频。
@@ -145,7 +184,7 @@ curl -X POST "http://your-domain.com/index.php" \
 
 ---
 
-### 3. 查询任务进度
+### 4. 查询任务进度
 
 #### 接口说明
 根据任务ID查询AI视频生成任务的进度和结果。
@@ -187,19 +226,21 @@ curl -X POST "http://your-domain.com/index.php" \
         "task_id": "7456789012345678901",
         "status": 1,
         "progress": 45,
+        "error": "",
         "videos": [],
+        "images": [],
         "covers": [],
         "wait_seconds": 30,
         "wait_minutes": 0,
         "wait_time_tip": "预计还需30秒",
-        "raw": {...}
+        "raw": {}
       }
     ]
   }
 }
 ```
 
-**任务完成：**
+**视频任务完成：**
 ```json
 {
   "code": 200,
@@ -210,16 +251,64 @@ curl -X POST "http://your-domain.com/index.php" \
         "task_id": "7456789012345678901",
         "status": 2,
         "progress": 100,
-        "videos": [
-          "https://video-url.com/video.mp4"
-        ],
-        "covers": [
-          "https://image-url.com/cover.jpg"
-        ],
+        "error": "",
+        "videos": ["https://video-url.com/video.mp4"],
+        "images": [],
+        "covers": ["https://image-url.com/cover.jpg"],
         "wait_seconds": 0,
         "wait_minutes": 0,
         "wait_time_tip": "",
-        "raw": {...}
+        "raw": {}
+      }
+    ]
+  }
+}
+```
+
+**图片任务完成：**
+```json
+{
+  "code": 200,
+  "msg": "请求成功",
+  "data": {
+    "task_list": [
+      {
+        "task_id": "7456789012345678901",
+        "status": 4,
+        "progress": 0,
+        "error": "",
+        "videos": [],
+        "images": ["https://p11-sign.douyinpic.com/obj/xxx"],
+        "covers": ["https://p3-sign.douyinpic.com/obj/xxx"],
+        "wait_seconds": 0,
+        "wait_minutes": 0,
+        "wait_time_tip": "",
+        "raw": {}
+      }
+    ]
+  }
+}
+```
+
+**任务失败：**
+```json
+{
+  "code": 200,
+  "msg": "请求成功",
+  "data": {
+    "task_list": [
+      {
+        "task_id": "7456789012345678901",
+        "status": 3,
+        "progress": 0,
+        "error": "生成失败：遇到问题，请稍后重试",
+        "videos": [],
+        "images": [],
+        "covers": [],
+        "wait_seconds": 0,
+        "wait_minutes": 0,
+        "wait_time_tip": "",
+        "raw": {}
       }
     ]
   }
@@ -228,10 +317,12 @@ curl -X POST "http://your-domain.com/index.php" \
 
 #### 状态说明
 
-| status | 说明 | progress | videos/covers |
-|--------|------|----------|---------------|
-| 1 | 任务进行中 | 当前进度百分比 | 为空 |
-| 2 | 任务完成 | 100 | 包含视频和封面URL |
+| status | 说明 | 返回字段 |
+|--------|------|----------|
+| 1 | 任务进行中 | `progress` 为当前百分比 |
+| 2 | 视频任务完成 | `videos`、`covers` 有内容 |
+| 3 | 任务失败 | `error` 包含失败原因 |
+| 4 | 图片任务完成 | `images`、`covers` 有内容 |
 
 ---
 

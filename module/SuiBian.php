@@ -14,7 +14,7 @@ class SuiBian
     public static $error = "";
     public static $hasChunkDelta = false;
 
-    public static function process($ugc_text, $resource_list = [])
+    public static function process($ugc_text, $resource_list = [], $outputType = 'Video')
     {
         $deviceId = Config::DEVICE_ID;
         $installId = Config::INSTALL_ID;
@@ -23,16 +23,17 @@ class SuiBian
         $createTimeMs = (string)((int)(microtime(true) * 1000));
         $api = "https://api-normal.amemv.com/aweme/v1/ai/process/?iid={$installId}&device_id={$deviceId}&ac=wifi&channel=&aid=8712&app_name=douyin_spark&version_code=370701&version_name=37.7.1&device_platform=android&os=android&ssmix=a&device_type=&device_brand=&language=zh&os_api=33&os_version=13&manifest_version_code=370702&resolution=1080*2276&dpi=440&update_version_code=37719900&_rticket={$_rticket}&package=com.ss.android.spark&first_launch_timestamp=1771500148&last_deeplink_update_version_code=0&cpu_support64=true&host_abi=arm64-v8a&is_guest_mode=0&app_type=normal&minor_status=0&appTheme=light&is_preinstall=0&need_personal_recommend=1&is_android_pad=0&is_android_fold=0&ts={$ts}";
 
-        // 构建 ugc_text JSON 字符串（确保每项都有 type = 2）
+        $resourceType = strtolower($outputType);
+
         $ugc_text_json = json_encode($ugc_text, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
         $body = [
             "aigc_request_meta" => [
-                "aigc_business_param" => "{\"source\":\"inhouse\",\"scene\":[\"ai_portrait\",\"ai_video\"],\"sub_scene\":[\"ai_portrait_other\",\"ai_video\"],\"effect_id\":\"116651344\",\"sync_type\":1,\"client_sub_scene\":\"ai_effect_ugc\",\"output_resource_type\":\"Video\",\"input_resource_type\":1,\"ugc_version\":0,\"algorithm_label_chain\":[[4924,4945,4958,5083,5528],[4924,4945,4946,4959,5478],[4924,4945,4958,5083,5577]]}",
+                "aigc_business_param" => "{\"source\":\"inhouse\",\"scene\":[\"ai_portrait\",\"ai_video\"],\"sub_scene\":[\"ai_portrait_other\",\"ai_video\"],\"effect_id\":\"116651344\",\"sync_type\":1,\"client_sub_scene\":\"ai_effect_ugc\",\"output_resource_type\":\"{$outputType}\",\"input_resource_type\":1,\"ugc_version\":0,\"algorithm_label_chain\":[[4924,4945,4958,5083,5528],[4924,4945,4946,4959,5478],[4924,4945,4958,5083,5577]]}",
                 "aigc_performance_param" => "{\"client_start_time\":\"{$createTimeMs}\"}"
             ],
             "is_async" => true,
-            "req_json" => "{\"biz_param\":{\"id\":\"116651344\",\"need_generate_sticker\":true,\"user_monitor\":{\"UserScene\":\"116651344\"},\"effect_ugc_extra\":{\"ugc_tags\":{\"ugc_text\":{$ugc_text_json}}},\"ai_auto_prompt_info\":{\"need_intent_detect\":true},\"resource_type\":\"video\",\"user_action\":{\"is_prompt_changed\":true},\"device_score\":\"8.7635\"}}",
+            "req_json" => "{\"biz_param\":{\"id\":\"116651344\",\"need_generate_sticker\":true,\"user_monitor\":{\"UserScene\":\"116651344\"},\"effect_ugc_extra\":{\"ugc_tags\":{\"ugc_text\":{$ugc_text_json}}},\"ai_auto_prompt_info\":{\"need_intent_detect\":true},\"resource_type\":\"{$resourceType}\",\"user_action\":{\"is_prompt_changed\":true},\"device_score\":\"8.7635\"}}",
             "resource_list" => $resource_list,
             "scene" => [
                 "biz_type" => "multiple_ai_creation",
@@ -97,23 +98,22 @@ class SuiBian
 
         foreach ($raw_list as $task) {
             /*
-             * task_status 说明（来自真实返回样本）：
-             *   1 → 任务进行中，generate_progress 为当前百分比进度
-             *   2 → 任务完成，resource_map 里有 videos / cover_images
+             * task_status:
+             *   1 → 任务进行中
+             *   2 → 视频任务完成，resource_map 里有 videos / cover_images
+             *   4 → 图片任务完成，resource_map 里有 images / watermark_images
              */
             $status   = $task['task_status']      ?? 0;
             $progress = $task['generate_progress'] ?? 0;
 
-            // ── 提取视频直链 ──────────────────────────────────
             $videos = [];
             foreach ($task['resource_map']['videos'] ?? [] as $v) {
                 $url_list = $v['url']['url_list'] ?? [];
                 if (!empty($url_list)) {
-                    $videos[] = $url_list[0]; // 取第一个镜像即可
+                    $videos[] = $url_list[0];
                 }
             }
 
-            // ── 提取封面图直链 ────────────────────────────────
             $covers = [];
             foreach ($task['resource_map']['cover_images'] ?? [] as $c) {
                 $url_list = $c['url']['url_list'] ?? [];
@@ -122,17 +122,33 @@ class SuiBian
                 }
             }
 
-            // ── 组装易用结构 ──────────────────────────────────
+            $images = [];
+            foreach ($task['resource_map']['images'] ?? [] as $img) {
+                $url_list = $img['url']['url_list'] ?? [];
+                if (!empty($url_list)) {
+                    $images[] = $url_list[0];
+                }
+            }
+
+            $error = '';
+            if ($status === 3) {
+                $error = $task['retry_detail']['main_title_content'] ?? '生成失败';
+                $toast = $task['retry_detail']['toast_content'] ?? '';
+                if ($toast) $error .= '：' . $toast;
+            }
+
             $item = [
-                'task_id'      => $task['task_id']      ?? '',
-                'status'       => $status,               // 1=进行中, 2=完成
-                'progress'     => $progress,             // 百分比，status==1 时有意义
-                'videos'       => $videos,               // 视频直链，status==2 时有内容
-                'covers'       => $covers,               // 封面直链，status==2 时有内容
-                'wait_seconds' => $task['wait_seconds']  ?? 0,
-                'wait_minutes' => $task['wait_minutes']  ?? 0,
+                'task_id'       => $task['task_id']      ?? '',
+                'status'        => $status,
+                'progress'      => $progress,
+                'error'         => $error,
+                'videos'        => $videos,
+                'images'        => $images,
+                'covers'        => $covers,
+                'wait_seconds'  => $task['wait_seconds']  ?? 0,
+                'wait_minutes'  => $task['wait_minutes']  ?? 0,
                 'wait_time_tip' => $task['wait_time_tip'] ?? '',
-                'raw'          => $task,                 // 保留原始数据
+                'raw'           => $task,
             ];
 
             $task_list[] = $item;
